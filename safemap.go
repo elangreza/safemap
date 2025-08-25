@@ -6,18 +6,25 @@ import (
 )
 
 type (
+	// operation represents a request to perform an operation on the SafeMap.
+	// It includes the operation type, key, value (if applicable), and a channel to send the result back.
 	operation[k comparable, v any] struct {
 		op        string
 		key       k
 		value     v
-		replyChan chan<- any
+		replyChan chan any
 	}
 
+	// SafeMap is a thread-safe map implementation using goroutines and channels.
+	// It supports concurrent access and modification of the map without the need for explicit locking.
+	// for initializing must use NewSafeMap function. if initialization NewSafeMap is not used will be panic if not used.
 	SafeMap[k comparable, v any] struct {
 		opChan chan operation[k, v]
 	}
 )
 
+// NewSafeMap creates and returns a new instance of SafeMap.
+// It initializes the internal goroutine that processes operations on the map.
 func NewSafeMap[k comparable, v any]() *SafeMap[k, v] {
 	sm := &SafeMap[k, v]{
 		opChan: make(chan operation[k, v]),
@@ -51,6 +58,8 @@ func NewSafeMap[k comparable, v any]() *SafeMap[k, v] {
 	return sm
 }
 
+// Set sets the value for the given key in the SafeMap.
+// If the SafeMap was not initialized using NewSafeMap, it panics.
 func (s *SafeMap[k, v]) Set(key k, val v) {
 	if s.opChan == nil {
 		panic("safemap can be only accessed with NewSafeMap")
@@ -66,6 +75,8 @@ func (s *SafeMap[k, v]) Set(key k, val v) {
 	<-replyChan
 }
 
+// Get retrieves the value for the given key from the SafeMap.
+// If the SafeMap was not initialized using NewSafeMap, it panics.
 func (s *SafeMap[k, v]) Get(key k) (val v) {
 	if s.opChan == nil {
 		panic("safemap can be only accessed with NewSafeMap")
@@ -82,6 +93,8 @@ func (s *SafeMap[k, v]) Get(key k) (val v) {
 	return reply.(v)
 }
 
+// Delete removes the key-value pair for the given key from the SafeMap.
+// If the SafeMap was not initialized using NewSafeMap, it panics.
 func (s *SafeMap[k, v]) Delete(key k) {
 	if s.opChan == nil {
 		panic("safemap can be only accessed with NewSafeMap")
@@ -97,6 +110,8 @@ func (s *SafeMap[k, v]) Delete(key k) {
 	<-replyChan
 }
 
+// Exist checks if the given key exists in the SafeMap.
+// If the SafeMap was not initialized using NewSafeMap, it panics.
 func (s *SafeMap[k, v]) Exist(key k) bool {
 	if s.opChan == nil {
 		panic("safemap can be only accessed with NewSafeMap")
@@ -113,6 +128,15 @@ func (s *SafeMap[k, v]) Exist(key k) bool {
 	return exist.(bool)
 }
 
+// Keys returns a slice of all keys in the SafeMap.
+// If the SafeMap was not initialized using NewSafeMap, it panics.
+// example
+//
+//	m := NewSafeMap[int, int]()
+//	m.Set(1, 2)
+//	for key := range m.Keys() {
+//		fmt.Println(key)
+//	}
 func (s *SafeMap[k, v]) Keys() iter.Seq[k] {
 	if s.opChan == nil {
 		panic("safemap can be only accessed with NewSafeMap")
@@ -129,6 +153,15 @@ func (s *SafeMap[k, v]) Keys() iter.Seq[k] {
 	return maps.Keys(m.(map[k]v))
 }
 
+// All returns a slice of all key-value pairs in the SafeMap.
+// If the SafeMap was not initialized using NewSafeMap, it panics.
+// example
+//
+//	m := NewSafeMap[int, int]()
+//	m.Set(1, 2)
+//	for key, value := range m.All() {
+//		fmt.Println(key, value)
+//	}
 func (s *SafeMap[k, v]) All() iter.Seq2[k, v] {
 	if s.opChan == nil {
 		panic("safemap can be only accessed with NewSafeMap")
@@ -145,6 +178,8 @@ func (s *SafeMap[k, v]) All() iter.Seq2[k, v] {
 	return maps.All(m.(map[k]v))
 }
 
+// Length returns the number of key-value pairs in the SafeMap.
+// If the SafeMap was not initialized using NewSafeMap, it panics.
 func (s *SafeMap[k, v]) Length() int {
 	if s.opChan == nil {
 		panic("safemap can be only accessed with NewSafeMap")
@@ -160,6 +195,8 @@ func (s *SafeMap[k, v]) Length() int {
 	return length.(int)
 }
 
+// GetMap returns a copy of the internal map of the SafeMap.
+// If the SafeMap was not initialized using NewSafeMap, it panics.
 func (s *SafeMap[k, v]) GetMap() map[k]v {
 	if s.opChan == nil {
 		panic("safemap can be only accessed with NewSafeMap")
