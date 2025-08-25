@@ -1,5 +1,10 @@
 package safemap
 
+import (
+	"iter"
+	"maps"
+)
+
 type (
 	operation[k comparable, v any] struct {
 		op        string
@@ -33,6 +38,12 @@ func NewSafeMap[k comparable, v any]() *SafeMap[k, v] {
 			case "exist":
 				_, ok := data[op.key]
 				op.replyChan <- ok
+			case "getMap":
+				copyMap := make(map[k]v, len(data))
+				maps.Copy(copyMap, data)
+				op.replyChan <- copyMap
+			case "getLen":
+				op.replyChan <- len(data)
 			}
 		}
 	}()
@@ -42,7 +53,7 @@ func NewSafeMap[k comparable, v any]() *SafeMap[k, v] {
 
 func (s *SafeMap[k, v]) Set(key k, val v) {
 	if s.opChan == nil {
-		panic("safemap can be only access with NewSafeMap")
+		panic("safemap can be only accessed with NewSafeMap")
 	}
 
 	replyChan := make(chan any)
@@ -57,7 +68,7 @@ func (s *SafeMap[k, v]) Set(key k, val v) {
 
 func (s *SafeMap[k, v]) Get(key k) (val v) {
 	if s.opChan == nil {
-		panic("safemap can be only access with NewSafeMap")
+		panic("safemap can be only accessed with NewSafeMap")
 	}
 
 	replyChan := make(chan any)
@@ -73,7 +84,7 @@ func (s *SafeMap[k, v]) Get(key k) (val v) {
 
 func (s *SafeMap[k, v]) Delete(key k) {
 	if s.opChan == nil {
-		panic("safemap can be only access with NewSafeMap")
+		panic("safemap can be only accessed with NewSafeMap")
 	}
 
 	replyChan := make(chan any)
@@ -88,7 +99,7 @@ func (s *SafeMap[k, v]) Delete(key k) {
 
 func (s *SafeMap[k, v]) Exist(key k) bool {
 	if s.opChan == nil {
-		panic("safemap can be only access with NewSafeMap")
+		panic("safemap can be only accessed with NewSafeMap")
 	}
 
 	replyChan := make(chan any)
@@ -102,30 +113,64 @@ func (s *SafeMap[k, v]) Exist(key k) bool {
 	return exist.(bool)
 }
 
-func (s *SafeMap[k, v]) Keys() func(yield func(k) bool) {
+func (s *SafeMap[k, v]) Keys() iter.Seq[k] {
 	if s.opChan == nil {
-		panic("safemap can be only access with NewSafeMap")
+		panic("safemap can be only accessed with NewSafeMap")
 	}
 
 	replyChan := make(chan any)
 	s.opChan <- operation[k, v]{
-		op:        "getKeys",
+		op:        "getMap",
 		replyChan: replyChan,
 	}
 
-	keys := <-replyChan
-	keysSlice := keys.([]k)
-	return func(yield func(k) bool) {
-		for _, k := range keysSlice {
-			if !yield(k) {
-				break
-			}
-		}
-	}
+	m := <-replyChan
+
+	return maps.Keys(m.(map[k]v))
 }
 
-func (s *SafeMap[k, v]) Seq2() func(yield func(k, v) bool) {
-	return func(yield func(k, v) bool) {
-
+func (s *SafeMap[k, v]) All() iter.Seq2[k, v] {
+	if s.opChan == nil {
+		panic("safemap can be only accessed with NewSafeMap")
 	}
+
+	replyChan := make(chan any)
+	s.opChan <- operation[k, v]{
+		op:        "getMap",
+		replyChan: replyChan,
+	}
+
+	m := <-replyChan
+
+	return maps.All(m.(map[k]v))
+}
+
+func (s *SafeMap[k, v]) Length() int {
+	if s.opChan == nil {
+		panic("safemap can be only accessed with NewSafeMap")
+	}
+
+	replyChan := make(chan any)
+	s.opChan <- operation[k, v]{
+		op:        "getLen",
+		replyChan: replyChan,
+	}
+
+	length := <-replyChan
+	return length.(int)
+}
+
+func (s *SafeMap[k, v]) GetMap() map[k]v {
+	if s.opChan == nil {
+		panic("safemap can be only accessed with NewSafeMap")
+	}
+
+	replyChan := make(chan any)
+	s.opChan <- operation[k, v]{
+		op:        "getMap",
+		replyChan: replyChan,
+	}
+
+	items := <-replyChan
+	return items.(map[k]v)
 }
